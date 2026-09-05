@@ -1,11 +1,11 @@
 package com.webdev.service;
 
 import com.webdev.infrastructure.StatusPublisher;
-import com.webdev.record.BatteryStatus;
-import com.webdev.record.WeatherStatus;
-import com.webdev.record.WeatherStatusMessage;
 import com.webdev.utils.Clock;
 import com.webdev.utils.RandomNumberGenerator;
+import com.webdev.weathermessages.BatteryStatus;
+import com.webdev.weathermessages.WeatherStatus;
+import com.webdev.weathermessages.WeatherStatusMessage;
 
 public class WeatherStationService {
     private final StatusPublisher publisher;

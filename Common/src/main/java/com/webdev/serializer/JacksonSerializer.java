@@ -1,4 +1,4 @@
-package com.webdev.utils;
+package com.webdev.serializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Serializer;

@@ -1,4 +1,4 @@
-package com.webdev.record;
+package com.webdev.weathermessages;
 
 public enum BatteryStatus {
     LOW, MID, HIGH;

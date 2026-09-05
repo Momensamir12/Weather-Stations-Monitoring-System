@@ -1,14 +1,13 @@
 package com.webdev.infrastructure;
 
-import com.webdev.record.WeatherStatusMessage;
+import com.webdev.constants.Topics;
+import com.webdev.weathermessages.WeatherStatusMessage;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import java.util.Properties;
 
 public class KafkaStatusPublisher implements StatusPublisher {
-
-    private static final String TOPIC = "station-status";
 
     private final KafkaProducer<String, WeatherStatusMessage> producer;
 
@@ -19,7 +18,7 @@ public class KafkaStatusPublisher implements StatusPublisher {
     @Override
     public void publish(WeatherStatusMessage message) {
         ProducerRecord<String, WeatherStatusMessage> record =
-                new ProducerRecord<>(TOPIC, message);
+                new ProducerRecord<>(Topics.STATIONS_STATUS, message);
 
         producer.send(record, (metadata, exception) -> {
             if (exception != null) {

@@ -1,6 +1,6 @@
 package com.webdev.config;
 
-import com.webdev.utils.JacksonSerializer;
+import com.webdev.serializer.JacksonSerializer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 
