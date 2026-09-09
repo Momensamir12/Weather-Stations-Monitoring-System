@@ -1,9 +1,10 @@
 package com.webdev.service;
 
-import com.webdev.record.BatteryStatus;
-import com.webdev.record.WeatherStatusMessage;
+
 import com.webdev.utils.Clock;
 import com.webdev.utils.RandomNumberGenerator;
+import com.webdev.weathermessages.BatteryStatus;
+import com.webdev.weathermessages.WeatherStatusMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

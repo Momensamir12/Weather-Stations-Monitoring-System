@@ -4,6 +4,7 @@ target/
 !**/src/test/**/target/
 .kotlin
 out
+bitcask-files
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml
