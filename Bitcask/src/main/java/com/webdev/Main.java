@@ -18,12 +18,14 @@ public class Main {
         try {
             Bitcask bitcask = new Bitcask();
             String key  = "station-1";
-            String value = "s3dola";
+            String value = "Kurosaki ichigo";
+
 
             byte [] keyBytes = key.getBytes(StandardCharsets.UTF_8);
             byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
 
-            bitcask.put(keyBytes, valueBytes);
+            System.out.println(new String(bitcask.get(keyBytes), StandardCharsets.UTF_8));
+            //bitcask.put(keyBytes, valueBytes);
 
             try{
                 byte[] valBytesRet = bitcask.get(keyBytes);

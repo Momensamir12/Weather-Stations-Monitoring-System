@@ -5,9 +5,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Comparator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
@@ -19,8 +22,8 @@ public class Bitcask implements AutoCloseable {
     private final String BASE_FILE_PATH = "Bitcask/bitcask-files/";
     private final String BASE_FILE_NAME = ".data";
     private final long sizeThreshold = 512;
-    private final int keySize = 4;
-    private final int valueSize = 4;
+    private final int keySizeBytes = 4;
+    private final int valueSizeBytes = 4;
     private final ConcurrentHashMap<ByteArrayKey, KeyDirEntry> keyDirectory;
     private int fileSequenceNumber;
     private FileChannel writeactiveFileChannel;
@@ -31,12 +34,13 @@ public class Bitcask implements AutoCloseable {
         keyDirectory = new ConcurrentHashMap<>();
         readFileChannels = new ConcurrentHashMap<>();
         fileSequenceNumber = 0;
+        buildKeyDirectory();
         setupActiveFileChannel();
     }
 
     public void put(byte[] key, byte[] value) throws IOException {
-        int recordSize = keySize + valueSize + key.length + value.length;
-        long valueByteOffset = nextWriteOffset + keySize + valueSize + key.length;
+        int recordSize = keySizeBytes + valueSizeBytes + key.length + value.length;
+        long valueByteOffset = nextWriteOffset + keySizeBytes + valueSizeBytes + key.length;
         ByteBuffer buffer = ByteBuffer.allocate(recordSize);
         buffer.putInt(key.length);
         buffer.putInt(value.length);
@@ -193,5 +197,106 @@ public class Bitcask implements AutoCloseable {
             return pathForFileId(fileSequenceNumber);
 
         return null;
+    }
+
+    void buildKeyDirectory () throws IOException {
+        Path folderPath = Path.of(BASE_FILE_PATH);
+        try (Stream<Path> stream = Files.walk(folderPath))
+        {
+            stream.filter(Files::isRegularFile)
+                    .sorted(Comparator.comparingInt(this::filIdFromPath))
+                    .forEach(path -> {
+                        try {
+                            scanKeysFromFile(path);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+
+                    });
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    int filIdFromPath (Path path)
+    {
+        String name = path.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+
+        int fileId = Integer.parseInt(name.substring(0, dot));
+
+        return fileId;
+    }
+
+    void scanKeysFromFile (Path path) throws IOException {
+
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ))
+        {
+            int fileId = filIdFromPath(path);
+            long bytesRead = 0;
+            boolean EOF = false;
+            int keyValSize = keySizeBytes + valueSizeBytes;
+
+            while (!EOF)
+           {
+               ByteBuffer keyValueSizeBuffer = ByteBuffer.allocate(keyValSize);
+               int keyValSizeTotal = 0;
+
+               while(keyValSizeTotal < keyValSize)
+               {
+                   int read = channel.read(keyValueSizeBuffer, bytesRead);
+                   if(read == -1)
+                   {
+                       EOF = true;
+                       break;
+                   }
+                   keyValSizeTotal += read;
+                   bytesRead += read;
+               }
+               if(EOF)
+                   break;
+
+               keyValueSizeBuffer.flip();
+               int keySize = keyValueSizeBuffer.getInt();
+               int valueSize = keyValueSizeBuffer.getInt();
+               int keyTotal = 0;
+
+               ByteBuffer keyBuffer = ByteBuffer.allocate(keySize);
+               while(keyTotal < keySize)
+               {
+                   int read = channel.read(keyBuffer, bytesRead);
+                   if(read == -1)
+                   {
+                       EOF = true;
+                       break;
+                   }
+                   keyTotal += read;
+                   bytesRead += read;
+               }
+
+               if(EOF)
+                   break;
+
+               keyBuffer.flip();
+
+               byte [] key =  new byte[keySize];
+               keyBuffer.get(key);
+               long valueOffset = bytesRead;
+
+               KeyDirEntry entry = new KeyDirEntry();
+               entry.fileId = fileId;
+               entry.valueSize = valueSize;
+               entry.valueOffset = valueOffset;
+
+               ByteArrayKey byteArrayKey = new ByteArrayKey(key);
+
+               keyDirectory.put(byteArrayKey, entry);
+               bytesRead += valueSize;
+           }
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
     }
 }
