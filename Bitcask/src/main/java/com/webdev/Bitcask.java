@@ -5,12 +5,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
-import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
@@ -18,15 +19,19 @@ import java.util.stream.Stream;
 public class Bitcask implements AutoCloseable {
 
     private static final long FORCE_TIME_THRESHOLD_MILLIS = 50;
+    private static final long NUMBER_OF_FILES_THRESHOLD = 30;
     private final ConcurrentHashMap<Integer, FileChannel> readFileChannels;
     private final String BASE_FILE_PATH = "Bitcask/bitcask-files/";
     private final String BASE_FILE_NAME = ".data";
+    private final String BASE_MERGE_FILE_NAME = ".tmp";
+    private final String BASE_DELETE_FILE_NAME = ".odata";
     private final long sizeThreshold = 512;
     private final int keySizeBytes = 4;
     private final int valueSizeBytes = 4;
     private final ConcurrentHashMap<ByteArrayKey, KeyDirEntry> keyDirectory;
     private int fileSequenceNumber;
     private FileChannel writeactiveFileChannel;
+    private Path writeactiveFilePath;
     private long nextWriteOffset;
     private long lastForceMillis = System.currentTimeMillis();
 
@@ -53,17 +58,31 @@ public class Bitcask implements AutoCloseable {
             int write = writeactiveFileChannel.write(buffer);
         }
         ByteArrayKey byteArrayKey = new ByteArrayKey(key);
-        KeyDirEntry entry = new KeyDirEntry();
-        entry.fileId = fileSequenceNumber;
-        entry.valueOffset = valueByteOffset;
-        entry.valueSize = value.length;
+        KeyDirEntry entry = new KeyDirEntry(fileSequenceNumber, valueByteOffset, value.length);
         nextWriteOffset += recordSize;
         keyDirectory.put(byteArrayKey, entry);
 
         forcePolicy();
-        sizePolicy();
+        if(sizePolicy())
+            openNewActiveFileChannel();
     }
 
+    public int putInFile(byte[] key, byte[] value, long offset, FileChannel fileChannel) throws IOException {
+        int recordSize = keySizeBytes + valueSizeBytes + key.length + value.length;
+        ByteBuffer buffer = ByteBuffer.allocate(recordSize);
+        buffer.putInt(key.length);
+        buffer.putInt(value.length);
+        buffer.put(key);
+        buffer.put(value);
+
+        buffer.flip();
+
+        while (buffer.hasRemaining()) {
+            int write = fileChannel.write(buffer, offset);
+        }
+
+        return recordSize;
+    }
     public byte[] get(byte[] key) throws IOException {
 
         ByteArrayKey byteArrayKey = new ByteArrayKey(key);
@@ -99,10 +118,12 @@ public class Bitcask implements AutoCloseable {
             writeactiveFileChannel.close();
 
         fileSequenceNumber++;
-        writeactiveFileChannel = FileChannel.open(pathForFileId(fileSequenceNumber),
+        writeactiveFileChannel = FileChannel.open(pathForDataFileId(fileSequenceNumber),
                 StandardOpenOption.CREATE,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.APPEND);
+
+        writeactiveFilePath = pathForDataFileId(fileSequenceNumber);
 
         nextWriteOffset = writeactiveFileChannel.size();
     }
@@ -122,7 +143,6 @@ public class Bitcask implements AutoCloseable {
 
     boolean sizePolicy() throws IOException {
         if (nextWriteOffset >= sizeThreshold){
-            openNewActiveFileChannel();
             return true;
         }
         return false;
@@ -138,14 +158,19 @@ public class Bitcask implements AutoCloseable {
         return false;
     }
 
-    Path pathForFileId(int id) {
+    Path pathForDataFileId(int id) {
         return Path.of(BASE_FILE_PATH + id + BASE_FILE_NAME);
+    }
+
+    Path pathForMergeFileId (int id)
+    {
+        return Path.of(BASE_FILE_PATH + id + BASE_MERGE_FILE_NAME);
     }
 
     FileChannel getFileChannel(int fileId) {
         return readFileChannels.computeIfAbsent(fileId, id -> {
             try {
-                return FileChannel.open(pathForFileId(id), StandardOpenOption.READ);
+                return FileChannel.open(pathForDataFileId(id), StandardOpenOption.READ);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -160,9 +185,13 @@ public class Bitcask implements AutoCloseable {
                         StandardOpenOption.CREATE,
                         StandardOpenOption.WRITE,
                         StandardOpenOption.APPEND);
+                writeactiveFilePath = path;
 
                 if(sizePolicy())
+                {
+                    openNewActiveFileChannel();
                     return;
+                }
 
                 nextWriteOffset = writeactiveFileChannel.size();
                 return;
@@ -180,6 +209,7 @@ public class Bitcask implements AutoCloseable {
 
         try (Stream<Path> stream = Files.walk(folderPath)) {
             stream.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(BASE_FILE_NAME))
                     .map(path -> path.getFileName().toString())
                     .map(name -> {
                         int dot = name.lastIndexOf('.');
@@ -194,31 +224,47 @@ public class Bitcask implements AutoCloseable {
         }
 
         if (foundFile.get())
-            return pathForFileId(fileSequenceNumber);
+            return pathForDataFileId(fileSequenceNumber);
 
         return null;
     }
 
-    void buildKeyDirectory () throws IOException {
+    void buildKeyDirectory() {
         Path folderPath = Path.of(BASE_FILE_PATH);
-        try (Stream<Path> stream = Files.walk(folderPath))
-        {
+        try (Stream<Path> stream = Files.walk(folderPath)) {
             stream.filter(Files::isRegularFile)
-                    .sorted(Comparator.comparingInt(this::filIdFromPath))
+                    .filter(path -> path.getFileName().toString().endsWith(BASE_FILE_NAME))
+                    .sorted(Comparator.comparingInt(this::fileIdFromPath))
                     .forEach(path -> {
                         try {
                             scanKeysFromFile(path);
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
-
                     });
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    int filIdFromPath (Path path)
+    void deleteMergedDataFiles() {
+        Path folderPath = Path.of(BASE_FILE_PATH);
+        try (Stream<Path> stream = Files.walk(folderPath)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(BASE_DELETE_FILE_NAME))
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    int fileIdFromPath (Path path)
     {
         String name = path.getFileName().toString();
         int dot = name.lastIndexOf('.');
@@ -232,12 +278,11 @@ public class Bitcask implements AutoCloseable {
 
         try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ))
         {
-            int fileId = filIdFromPath(path);
+            int fileId = fileIdFromPath(path);
             long bytesRead = 0;
-            boolean EOF = false;
             int keyValSize = keySizeBytes + valueSizeBytes;
 
-            while (!EOF)
+            while (true)
            {
                ByteBuffer keyValueSizeBuffer = ByteBuffer.allocate(keyValSize);
                int keyValSizeTotal = 0;
@@ -247,14 +292,11 @@ public class Bitcask implements AutoCloseable {
                    int read = channel.read(keyValueSizeBuffer, bytesRead);
                    if(read == -1)
                    {
-                       EOF = true;
-                       break;
+                       return;
                    }
                    keyValSizeTotal += read;
                    bytesRead += read;
                }
-               if(EOF)
-                   break;
 
                keyValueSizeBuffer.flip();
                int keySize = keyValueSizeBuffer.getInt();
@@ -265,17 +307,9 @@ public class Bitcask implements AutoCloseable {
                while(keyTotal < keySize)
                {
                    int read = channel.read(keyBuffer, bytesRead);
-                   if(read == -1)
-                   {
-                       EOF = true;
-                       break;
-                   }
                    keyTotal += read;
                    bytesRead += read;
                }
-
-               if(EOF)
-                   break;
 
                keyBuffer.flip();
 
@@ -283,10 +317,8 @@ public class Bitcask implements AutoCloseable {
                keyBuffer.get(key);
                long valueOffset = bytesRead;
 
-               KeyDirEntry entry = new KeyDirEntry();
-               entry.fileId = fileId;
-               entry.valueSize = valueSize;
-               entry.valueOffset = valueOffset;
+               KeyDirEntry entry = new KeyDirEntry(fileId, valueOffset, valueSize);
+
 
                ByteArrayKey byteArrayKey = new ByteArrayKey(key);
 
@@ -299,4 +331,209 @@ public class Bitcask implements AutoCloseable {
             throw new UncheckedIOException(e);
         }
     }
+
+    public boolean mergeCompactionPolicy ()
+    {
+        Path folderPath = Path.of(BASE_FILE_PATH);
+        try (Stream<Path> stream = Files.walk(folderPath))
+        {
+            long fileCount = stream.filter(Files::isRegularFile)
+                    .count();
+
+            return fileCount >= NUMBER_OF_FILES_THRESHOLD;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public void merge() {
+        Path folderPath = Path.of(BASE_FILE_PATH);
+
+        try {
+            int mergeFileSequence = 1;
+            Path mergeFilePath = pathForMergeFileId(mergeFileSequence);
+
+            FileChannel currentMergeFile = FileChannel.open(
+                    mergeFilePath,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.APPEND
+            );
+
+            HashMap<ByteArrayKey, TempKeyDirEntry> tempKeyDirectory = new HashMap<>();
+            long mergeFileOffset = 0;
+
+            List<Path> filesToMerge;
+            try (Stream<Path> stream = Files.walk(folderPath)) {
+                filesToMerge = stream
+                        .filter(Files::isRegularFile)
+                        .filter(path -> path.getFileName().toString().endsWith(BASE_FILE_NAME))
+                        .filter(path -> !path.equals(writeactiveFilePath))
+                        .sorted(Comparator.comparingInt(this::fileIdFromPath))
+                        .toList();
+            }
+
+            for (Path path : filesToMerge) {
+                long bytesWritten;
+                try {
+                    bytesWritten = scanKeysFromFile(
+                            path, currentMergeFile, mergeFileOffset, tempKeyDirectory, mergeFileSequence
+                    );
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+
+                mergeFileOffset += bytesWritten;
+
+                if (mergeFileOffset >= sizeThreshold) {
+                    currentMergeFile.close();
+                    mergeFileSequence++;
+                    mergeFilePath = pathForMergeFileId(mergeFileSequence);
+                    currentMergeFile = FileChannel.open(
+                            mergeFilePath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND
+                    );
+                    mergeFileOffset = 0;
+                }
+            }
+
+            currentMergeFile.close();
+
+            final int liveMergeCount = mergeFileSequence; // freeze for use below
+
+            setMergeFilesAsLive(); // K.tmp -> K.data, K in [1, liveMergeCount]; overwrites old files with those same ids
+
+            for (ByteArrayKey key : tempKeyDirectory.keySet()) {
+                if (tempKeyDirectory.containsKey(key) && keyDirectory.containsKey(key)) {
+                    TempKeyDirEntry tempKeyDirEntry = tempKeyDirectory.get(key);
+                    KeyDirEntry keyDirEntry = keyDirectory.get(key);
+                    if (tempKeyDirEntry.oldFileId == keyDirEntry.fileId) {
+                        KeyDirEntry newEntry = new KeyDirEntry(
+                                tempKeyDirEntry.fileId, tempKeyDirEntry.valueOffset, tempKeyDirEntry.valueSize
+                        );
+                        keyDirectory.replace(key, keyDirEntry, newEntry);
+                    }
+                }
+            }
+
+            for (Path path : filesToMerge) {
+                FileChannel old = readFileChannels.remove(fileIdFromPath(path));
+                if (old != null) old.close();
+            }
+
+
+            for (Path path : filesToMerge) {
+                int id = fileIdFromPath(path);
+                if (id > liveMergeCount) {
+                    Files.move(path, pathForOldDataFileId(id), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    void setMergeFilesAsLive() {
+        Path folderPath = Path.of(BASE_FILE_PATH);
+        try (Stream<Path> stream = Files.walk(folderPath)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(BASE_MERGE_FILE_NAME))
+                    .forEach(path -> {
+                        try {
+                            int seq = fileIdFromPath(path);
+                            Files.move(path, pathForDataFileId(seq), StandardCopyOption.REPLACE_EXISTING);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    long scanKeysFromFile (Path path, FileChannel mergeFileChannel, long mergeFileOffset,
+                           HashMap<ByteArrayKey, TempKeyDirEntry> tempKeyDirectory, int mergeFileSequence) throws IOException {
+
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ))
+        {
+            int fileId = fileIdFromPath(path);
+            long bytesRead = 0;
+            long bytesWritten = 0;
+            int keyValSize = keySizeBytes + valueSizeBytes;
+
+            while (true)
+            {
+                ByteBuffer keyValueSizeBuffer = ByteBuffer.allocate(keyValSize); // read size of key and value
+                int keyValSizeTotal = 0;
+
+                while(keyValSizeTotal < keyValSize)
+                {
+                    int read = channel.read(keyValueSizeBuffer, bytesRead);
+                    if(read == -1)
+                    {
+                        return bytesWritten;
+                    }
+                    keyValSizeTotal += read;
+                    bytesRead += read;
+                }
+
+                keyValueSizeBuffer.flip();
+                int keySize = keyValueSizeBuffer.getInt();
+                int valueSize = keyValueSizeBuffer.getInt();
+                int keyTotal = 0;
+
+                ByteBuffer keyBuffer = ByteBuffer.allocate(keySize);          // read key
+                while(keyTotal < keySize)
+                {
+                    int read = channel.read(keyBuffer, bytesRead);
+                    keyTotal += read;
+                    bytesRead += read;
+                }
+
+                keyBuffer.flip();
+
+                byte [] key =  new byte[keySize];
+                keyBuffer.get(key);
+                long valueOffset = bytesRead;
+                ByteArrayKey byteArrayKey = new ByteArrayKey(key);        // create entry for key directory hash table
+
+                long liveValueOffset = keyDirectory.get(byteArrayKey).valueOffset;
+                if(valueOffset != liveValueOffset)                       // if the offset doesn't match live key directory offset , skip the key
+                {
+                    bytesRead += valueSize;
+                    continue;
+                }
+
+                int valueTotal = 0;
+                ByteBuffer valueBuffer = ByteBuffer.allocate(valueSize); // read the value
+                while(valueTotal < valueSize)
+                {
+                    int read = channel.read(valueBuffer, bytesRead);
+                    valueTotal += read;
+                    bytesRead += read;
+                }
+                byte [] value = new byte[valueSize];
+                valueBuffer.get(value);
+                long mergeFileValueOffset = mergeFileOffset + keySizeBytes + valueSizeBytes + keySize; // calculate value offset in the merged file
+                int recordSize = putInFile(key, value, mergeFileOffset, mergeFileChannel);              // put the record in the merge file
+
+                mergeFileOffset += recordSize;
+                bytesWritten += recordSize;
+
+                int oldFileId = keyDirectory.get(byteArrayKey).fileId;
+                TempKeyDirEntry entry = new TempKeyDirEntry(mergeFileSequence, oldFileId, mergeFileValueOffset, value.length);
+
+                tempKeyDirectory.put(byteArrayKey, entry);                                          // put the entry in the merge file
+            }
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    Path pathForOldDataFileId(int id) {
+        return Path.of(BASE_FILE_PATH + id + BASE_DELETE_FILE_NAME);
+    }
 }
+
