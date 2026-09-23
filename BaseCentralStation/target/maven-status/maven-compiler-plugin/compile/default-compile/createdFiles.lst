@@ -1,0 +1,12 @@
+gen/AvroRainMessage.class
+gen/AvroWeatherStatusMessage$Builder.class
+gen/WeatherStatus.class
+com/webdev/service/KafkaStreamsRainDetectionService.class
+gen/WeatherStatus$Builder.class
+com/webdev/serde/JsonSerde.class
+com/webdev/Main.class
+com/webdev/config/KafkaConfig.class
+gen/AvroWeatherStatusMessage.class
+gen/BatteryStatus.class
+gen/AvroRainMessage$Builder.class
+com/webdev/service/BitcaskConsumerService.class

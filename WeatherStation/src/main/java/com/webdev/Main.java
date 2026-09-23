@@ -18,7 +18,10 @@ public class Main {
         Dotenv dotEnv = Dotenv.load();
         String kafkaBootStrapServer = dotEnv.get("KAFKA_BOOTSTRAP_SERVER");
         long stationId = Long.parseLong(dotEnv.get("STATION_ID"));
-
+        System.setProperty(
+                "org.apache.avro.SERIALIZABLE_PACKAGES",
+                "gen"
+        );
         KafkaConfig config = new KafkaConfig(kafkaBootStrapServer);
         StatusPublisher kafkaStatusPublisher = new KafkaStatusPublisher(config.defaultProducerProperties());
         RandomNumberGenerator randomNumberGenerator = new RandomNumberGeneratorImpl();

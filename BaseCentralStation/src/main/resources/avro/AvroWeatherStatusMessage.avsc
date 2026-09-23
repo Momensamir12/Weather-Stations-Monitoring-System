@@ -1,0 +1,30 @@
+{
+  "type": "record",
+  "name": "AvroWeatherStatusMessage",
+  "namespace": "gen",
+  "fields": [
+    {"name": "stationId", "type": "long"},
+    {"name": "sequenceNumber", "type": "long"},
+    {
+      "name": "batteryStatus",
+      "type": {
+        "type": "enum",
+        "name": "BatteryStatus",
+        "symbols": ["LOW", "MID", "HIGH"]
+      }
+    },
+    {"name": "statusTimeStamp", "type": "long"},
+    {
+      "name": "weatherStatus",
+      "type": {
+        "type": "record",
+        "name": "WeatherStatus",
+        "fields": [
+          {"name": "humidity", "type": "int"},
+          {"name": "temperature", "type": "int"},
+          {"name": "windSpeed", "type": "int"}
+        ]
+      }
+    }
+  ]
+}

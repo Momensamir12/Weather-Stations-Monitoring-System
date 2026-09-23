@@ -1,0 +1,9 @@
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/src/main/java/com/webdev/Main.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/src/main/java/com/webdev/config/KafkaConfig.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/src/main/java/com/webdev/serde/JsonSerde.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/src/main/java/com/webdev/service/BitcaskConsumerService.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/src/main/java/com/webdev/service/KafkaStreamsRainDetectionService.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/target/generated-sources/avro/gen/AvroRainMessage.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/target/generated-sources/avro/gen/AvroWeatherStatusMessage.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/target/generated-sources/avro/gen/BatteryStatus.java
+/home/as/WeatherStationMonitoringSystem/BaseCentralStation/target/generated-sources/avro/gen/WeatherStatus.java
