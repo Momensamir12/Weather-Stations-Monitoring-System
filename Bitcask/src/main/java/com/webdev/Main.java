@@ -1,5 +1,7 @@
 package com.webdev;
 
+import com.webdev.server.BitcaskServer;
+
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -15,38 +17,8 @@ import java.util.HashMap;
 public class Main {
     public static void main(String[] args) throws IOException {
 
-        try {
-            Bitcask bitcask = new Bitcask();
-            String key  = "station-1";
-            String value = "Kurosaki ichigo";
-
-
-            byte [] keyBytes = key.getBytes(StandardCharsets.UTF_8);
-            byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
-
-            System.out.println(new String(bitcask.get(keyBytes), StandardCharsets.UTF_8));
-            //bitcask.put(keyBytes, valueBytes);
-
-            try{
-                byte[] valBytesRet = bitcask.get(keyBytes);
-                String valRet = new String(valBytesRet, StandardCharsets.UTF_8);
-                System.out.println(valRet);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            bitcask.put(keyBytes, "aizen".getBytes(StandardCharsets.UTF_8));
-            try{
-                byte[] valBytesRet = bitcask.get(keyBytes);
-                String valRet = new String(valBytesRet, StandardCharsets.UTF_8);
-                System.out.println(valRet);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
-
+        Bitcask bitcask = new Bitcask("/home/as/WeatherStationMonitoringSystem/data/bitcask");
+        BitcaskServer server = new BitcaskServer(9090, 2, bitcask);
+        server.start();
     }
 }

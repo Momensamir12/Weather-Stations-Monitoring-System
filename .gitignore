@@ -4,6 +4,11 @@ WeatherStation/target/
 !**/src/test/**/target/
 .kotlin
 out
+data
+.parquet
+.data
+
+
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml

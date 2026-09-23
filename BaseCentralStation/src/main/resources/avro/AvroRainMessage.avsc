@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "AvroRainMessage",
+  "namespace": "gen",
+  "fields": [
+    {
+      "name": "stationId",
+      "type": "long"
+    },
+    {
+      "name": "humidity",
+      "type": "int"
+    }
+  ]
+}
