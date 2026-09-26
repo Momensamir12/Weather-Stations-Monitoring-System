@@ -1,66 +1,108 @@
 package com.webdev;
 
+import com.webdev.config.AppBootstrap;
 import com.webdev.config.KafkaConfig;
 import com.webdev.server.BitcaskServer;
 import com.webdev.service.BitcaskConsumerService;
 import com.webdev.service.KafkaStreamsRainDetectionService;
+import com.webdev.service.ManagedService;
 import com.webdev.service.ParquetArchiverService;
 import io.github.cdimascio.dotenv.Dotenv;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class Main {
+
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
+    private static final int BITCASK_SERVER_THREAD_POOL_SIZE = 2;
+    private static final long SERVER_STOP_JOIN_TIMEOUT_MILLIS = 10_000;
+
     public static void main(String[] args) throws IOException {
 
-        Dotenv dotenv = Dotenv.load();
-        KafkaConfig config = new KafkaConfig(dotenv.get("KAFKA_BOOTSTRAP_SERVER"), dotenv.get("SCHEMA_REGISTRY_URL"));
-        System.setProperty(
-                "org.apache.avro.SERIALIZABLE_PACKAGES",
-                "gen"
-        );
+        Dotenv dotenv = AppBootstrap.loadEnv();
 
-        KafkaStreamsRainDetectionService rainDetectionService = new KafkaStreamsRainDetectionService(config);
-        rainDetectionService.process();
+        KafkaConfig config = new KafkaConfig(
+                dotenv.get("KAFKA_BOOTSTRAP_SERVER"),
+                dotenv.get("SCHEMA_REGISTRY_URL"));
 
         Bitcask bitcask = new Bitcask(dotenv.get("BITCASK_DATA_DIR"));
+
+        int bitcaskServerPort = Integer.parseInt(dotenv.get("BITCASK_SERVER_PORT", "9090"));
+
+        KafkaStreamsRainDetectionService rainDetectionService = new KafkaStreamsRainDetectionService(config);
         BitcaskConsumerService bitcaskConsumerService = new BitcaskConsumerService(bitcask, config);
-        bitcaskConsumerService.start();
+        ParquetArchiverService parquetService = new ParquetArchiverService(
+                Path.of(dotenv.get("PARQUET_OUTPUT_DIR")), config);
+        BitcaskServer bitcaskServer = new BitcaskServer(bitcaskServerPort, BITCASK_SERVER_THREAD_POOL_SIZE, bitcask);
 
+        List<ManagedService> services = new ArrayList<>();
+        services.add(rainDetectionService);
+        services.add(bitcaskConsumerService);
+        services.add(parquetService);
+        services.add(asManagedService(bitcaskServer));
 
-        java.nio.file.Path parquetDir = java.nio.file.Path.of(dotenv.get("PARQUET_OUTPUT_DIR"));
-        ParquetArchiverService parquetService = new ParquetArchiverService(parquetDir, config);
-        parquetService.start();
-
-        BitcaskServer server = new BitcaskServer(9090, 2, bitcask);
-        Thread serverThread = new Thread(() -> {
-            try {
-                server.start();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }, "bitcask-server");
-        serverThread.start();
+        services.forEach(ManagedService::start);
+        log.info("All services started");
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                bitcaskConsumerService.stop();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            server.stop();
-            rainDetectionService.stop();
-            parquetService.stop();
-        }, "shutdown-hook"));
+            log.info("Shutdown signal received, stopping services");
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            List<ManagedService> reversed = new ArrayList<>(services);
+            Collections.reverse(reversed);
+            reversed.forEach(service -> {
+                try {
+                    service.stop();
+                } catch (Exception e) {
+                    log.error("Error stopping {}", service.getClass().getSimpleName(), e);
+                }
+            });
+
             try {
-                bitcaskConsumerService.stop();
+                bitcask.close();
+                log.info("Bitcask closed");
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                log.error("Error closing Bitcask", e);
             }
-            rainDetectionService.stop();
-            parquetService.stop();
+
+            log.info("Shutdown complete");
         }, "shutdown-hook"));
+    }
+
+    private static ManagedService asManagedService(BitcaskServer server) {
+        return new ManagedService() {
+            private Thread serverThread;
+
+            @Override
+            public void start() {
+                serverThread = new Thread(() -> {
+                    try {
+                        server.start();
+                    } catch (IOException e) {
+                        log.error("Bitcask server failed", e);
+                    }
+                }, "bitcask-server");
+                serverThread.start();
+                log.info("Bitcask server started");
+            }
+
+            @Override
+            public void stop() {
+                server.stop();
+                try {
+                    serverThread.join(SERVER_STOP_JOIN_TIMEOUT_MILLIS);
+                    if (serverThread.isAlive()) {
+                        log.warn("Bitcask server thread did not stop within {}ms", SERVER_STOP_JOIN_TIMEOUT_MILLIS);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
     }
 }

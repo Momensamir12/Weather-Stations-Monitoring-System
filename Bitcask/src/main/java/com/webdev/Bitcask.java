@@ -114,8 +114,7 @@ public class Bitcask implements AutoCloseable {
             try {
                 channel = getReadFileChannel(entry.fileId);
             } catch (NoSuchFileException e) {
-                // file was retired and renamed away between our keydir read and
-                // our open attempt — keydir has since been updated, retry against it
+                try { Thread.sleep(2); } catch (InterruptedException ignored) {}
                 continue;
             }
 

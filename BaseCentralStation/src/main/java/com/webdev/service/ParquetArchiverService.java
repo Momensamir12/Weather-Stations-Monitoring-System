@@ -1,9 +1,9 @@
 package com.webdev.service;
 
+import com.webdev.avro.AvroWeatherStatusMessage;
 import com.webdev.config.KafkaConfig;
 import com.webdev.constants.Topics;
 import com.webdev.record.PartitionKey;
-import gen.AvroWeatherStatusMessage;
 import org.apache.avro.specific.SpecificData;
 import org.apache.hadoop.fs.Path;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -23,9 +23,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class ParquetArchiverService {
+public class ParquetArchiverService implements ManagedService {
 
     private static final Logger log = LoggerFactory.getLogger(ParquetArchiverService.class);
 
@@ -36,7 +37,10 @@ public class ParquetArchiverService {
     private final KafkaConfig kafkaConfig;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile KafkaConsumer<String, AvroWeatherStatusMessage> consumer;
-    private Thread thread;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor(
+            r -> new Thread(r, "parquet archiver"));
+
+    private Future<?> task;
 
     private final List<ConsumerRecord<String, AvroWeatherStatusMessage>> buffer = new ArrayList<>();
     private long lastFlushMillis = System.currentTimeMillis();
@@ -48,12 +52,7 @@ public class ParquetArchiverService {
 
     public void start() {
         running.set(true);
-        thread = new Thread(this::runLoop, "parquet-archiver");
-        // Safety net: if something we didn't anticipate escapes runLoop's own
-        // try/catch, this guarantees it still gets logged instead of dying silently.
-        thread.setUncaughtExceptionHandler((t, e) ->
-                log.error("parquet-archiver thread terminated with an uncaught exception", e));
-        thread.start();
+        task = executor.submit(this::runLoop);
         log.info("Started parquet archiver thread, outputDir={}", outputDir);
     }
 
@@ -113,7 +112,7 @@ public class ParquetArchiverService {
         for (var entry : byPartition.entrySet()) {
             try {
                 writePartitionFile(entry.getKey(), entry.getValue());
-            } catch (IOException e) {
+            } catch (Exception e) {
                 log.error("Failed writing partition file for stationId={} date={}, {} records lost from this flush",
                         entry.getKey().stationId(), entry.getKey().date(), entry.getValue().size(), e);
                 throw e;
@@ -158,19 +157,21 @@ public class ParquetArchiverService {
     }
 
     public void stop() {
+        if (!running.compareAndSet(true, false)) {
+            return;
+        }
+
         log.info("Stopping parquet archiver thread");
-        running.set(false);
         var c = consumer;
         if (c != null) c.wakeup();
         try {
-            thread.join(15_000);
-            if (thread.isAlive()) {
-                log.warn("parquet-archiver thread did not terminate within 15s of shutdown signal");
-            } else {
-                log.info("parquet-archiver thread stopped cleanly");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            task.get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Exception while stopping parquet archiver task", e);
+            throw new RuntimeException(e);
+        }
+        finally {
+            executor.shutdownNow();
         }
     }
 

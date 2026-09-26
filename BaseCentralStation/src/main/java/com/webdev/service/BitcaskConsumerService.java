@@ -1,9 +1,9 @@
 package com.webdev.service;
 
 import com.webdev.Bitcask;
+import com.webdev.avro.AvroWeatherStatusMessage;
 import com.webdev.config.KafkaConfig;
 import com.webdev.constants.Topics;
-import gen.AvroWeatherStatusMessage;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
 import org.slf4j.Logger;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class BitcaskConsumerService {
+public class BitcaskConsumerService implements ManagedService{
 
     private final Logger log = LoggerFactory.getLogger(BitcaskConsumerService.class);
     private final Bitcask bitcask;
@@ -65,21 +65,23 @@ public class BitcaskConsumerService {
         }
     }
 
-    public void stop() throws Exception {
+    public void stop() {
 
-        running.set(false);
+        if (!running.compareAndSet(true, false)) {
+            return;
+        }
+
         var c = consumer;
         if (c != null) c.wakeup();
 
         try {
             task.get(10, TimeUnit.SECONDS);
-        } catch (ExecutionException _) {
-
+        } catch (ExecutionException e) {
+            log.error("Exception while stopping Bitcask consumer task", e);
         } catch (TimeoutException | InterruptedException e) {
             task.cancel(true);
         } finally {
             executor.shutdownNow();
-            bitcask.close();
         }
     }
 }

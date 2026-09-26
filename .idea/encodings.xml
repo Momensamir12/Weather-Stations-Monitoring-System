@@ -7,6 +7,10 @@
     <file url="file://$PROJECT_DIR$/Bitcask/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Common/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/OpenMeteoAdapter/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/OpenMeteoAdapter/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/OpenMeteoService/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/OpenMeteoService/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/WeatherStation/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/WeatherStation/src/main/resources" charset="UTF-8" />
   </component>

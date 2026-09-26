@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "AvroRainMessage",
+  "namespace": "com.webdev.avro",
+  "fields": [
+    {
+      "name": "stationId",
+      "type": ["null","long"],
+      "default": null
+    },
+    {
+      "name": "humidity",
+      "type": "int"
+    }
+  ]
+}

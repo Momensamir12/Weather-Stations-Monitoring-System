@@ -1,5 +1,10 @@
 package com.webdev.weathermessages;
 
-public record WeatherStatusMessage(long stationId, long sequenceNumber, BatteryStatus batteryStatus,
-                                   long statusTimeStamp, WeatherStatus weatherStatus) {
+public record WeatherStatusMessage(
+        Long stationId,
+        Long sequenceNumber,
+        BatteryStatus batteryStatus,
+        long statusTimeStamp,
+        WeatherStatus weatherStatus
+) {
 }

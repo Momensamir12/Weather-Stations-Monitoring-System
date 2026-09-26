@@ -1,9 +1,9 @@
 package com.webdev.service;
 
+import com.webdev.avro.AvroRainMessage;
+import com.webdev.avro.AvroWeatherStatusMessage;
 import com.webdev.config.KafkaConfig;
 import com.webdev.constants.Topics;
-import gen.AvroRainMessage;
-import gen.AvroWeatherStatusMessage;
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.Serde;
@@ -20,11 +20,10 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.Properties;
 
-public class KafkaStreamsRainDetectionService {
+public class KafkaStreamsRainDetectionService implements ManagedService{
 
     private static final Logger log = LoggerFactory.getLogger(KafkaStreamsRainDetectionService.class);
 
-    private final StreamsBuilder builder = new StreamsBuilder();
     private final KafkaConfig kafkaConfig;
     private volatile KafkaStreams stream;
 
@@ -32,8 +31,9 @@ public class KafkaStreamsRainDetectionService {
         this.kafkaConfig = kafkaConfig;
     }
 
-    public void process() {
+    public void start() {
 
+        StreamsBuilder builder = new StreamsBuilder();
         Properties props = kafkaConfig.defaultStreamsConfig();
 
         Map<String, String> serdeConfig = Map.of(
@@ -85,8 +85,7 @@ public class KafkaStreamsRainDetectionService {
 
         stream = new KafkaStreams(topology, props);
 
-        // Without this, a dead stream thread (deserialization error, processing
-        // exception, etc.) fails silently - the app looks alive but stops doing anything.
+
         stream.setUncaughtExceptionHandler(exception -> {
             log.error("Uncaught exception in rain-detection Kafka Streams thread", exception);
             return StreamsUncaughtExceptionHandler.StreamThreadExceptionResponse.SHUTDOWN_CLIENT;
