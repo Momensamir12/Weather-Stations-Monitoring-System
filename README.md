@@ -54,11 +54,10 @@ Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 ### Weather station 
 
 `WeatherStation` emits a reading every second. Battery status is varied randomly as following : 
- Low = 30% 
- Medium = 40% 
- High = 30% 
-and 10% of generated messages are dropped before publishing to simulate
-queryable data which will get ingested by elastic search 
+  *Low = 30% 
+  *Medium = 40% 
+  *High = 30% 
+and 10% of generated messages are dropped before publishing to simulate network failures and queryable data which will get ingested by elastic search 
 
 
 ### Open-Meteo adapter
@@ -130,13 +129,13 @@ The weather data stored in Elasticsearch is analyzed in Kibana to validate the b
 
 ### Battery status distribution per station
 
-The battery status distribution is expected to approach the specified 30% low, 40% medium, and 30% high distribution as more messages are collected.
+The battery status distribution confirms the specified 30% low, 40% medium, and 30% high distribution as more messages are collected.
 
 ![Battery status distribution](battery-percentage.png)
 
 ### Dropped messages per station
 
-10% of generated weather-station messages are intentionally dropped before they are published to Kafka.
+10% of generated weather-station messages drop rate.
 
 ![Dropped messages per station](dropped-messages.png)
 
