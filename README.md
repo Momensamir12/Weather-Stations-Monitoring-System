@@ -67,15 +67,12 @@ Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 
 ### Base central station
 
-The base central station consists of four main services, each handling a different part of the processing pipeline.
+The base central station is the main processing component of the system. It consumes weather data from Kafka and handles the downstream processing pipeline.
 
-`KafkaStreamsRainDetectionService` uses Kafka Streams to process incoming weather status messages and detect rain events by filtering messages where humidity is above 70%. Detected events are mapped to `AvroRainMessage` records and published to the `rain-events` Kafka topic.
+It detects rain events based on humidity, maintains the latest weather status for each station in Bitcask, and archives the complete stream of weather messages into Parquet files for further analysis in Elasticsearch and Kibana.
 
-`BitcaskConsumerService` consumes weather status messages from Kafka. For each message, it updates the corresponding station entry in the Bitcask store, using the station ID as the key.
+It exposes the Bitcask store through socket server on port 9090, allowing clients to query the latest weather data for individual stations or all stored stations.
 
-`ParquetArchiverService` writes all received messages to Parquet files and partitions them by time and station ID.
-
-`BitcaskServer` exposes the Bitcask store through a socket server on port `9090`. The server handles client requests for reading stored values, allowing the latest weather status for individual stations or all stored keys to be queried remotely.
 
 ### Bitcask
 
