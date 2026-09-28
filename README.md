@@ -53,24 +53,6 @@ All incoming weather messages are archived as Parquet files and later ingested i
 
 A distributed, stream-processing pipeline for IoT weather data.
 
----
-
-## Table of contents
-
-* [Architecture](#architecture)
-* [Message schema](#message-schema)
-* [Components](#components)
-
-  * [Weather station (mock)](#weather-station-mock)
-  * [Open-Meteo adapter (bonus)](#open-meteo-adapter-bonus)
-  * [Base central station](#base-central-station)
-  * [Bitcask](#bitcask)
-  * [Parquet archive and Elasticsearch ingestion](#parquet-archive-and-elasticsearch-ingestion)
-* [Build and run](#build-and-run)
-* [Kubernetes deployment](#kubernetes-deployment)
-* [Kibana analyses](#kibana-analyses)
-
----
 
 ## Architecture
 
