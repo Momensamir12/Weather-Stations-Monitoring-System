@@ -17,7 +17,6 @@ A distributed, stream-processing pipeline for IoT weather data.
   * [Parquet archive and Elasticsearch ingestion](#parquet-archive-and-elasticsearch-ingestion)
 * [Build and run](#build-and-run)
 * [Kubernetes deployment](#kubernetes-deployment)
-* [Querying Bitcask](#querying-bitcask)
 * [Kibana analyses](#kibana-analyses)
 
 ---
