@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."   # repo root (this script lives in scripts/)
 
 KEEP_DATA="${KEEP_DATA:-false}"
-K8S_DIR="kubernetes"
+K8S_DIR="k8s-manifests"
 
 # PVC names (from the manifests / `kubectl get pv`)
 CENTRAL_PVC="base-central-storage"

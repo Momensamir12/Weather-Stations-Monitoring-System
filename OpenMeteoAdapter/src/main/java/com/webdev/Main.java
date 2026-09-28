@@ -18,7 +18,7 @@ public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
     private static final int OPEN_METEO_STATION_ID = 100;
-    private static final Duration DEFAULT_POLL_INTERVAL = Duration.ofSeconds(1);
+    private static final Duration DEFAULT_POLL_INTERVAL = Duration.ofMinutes(10);
 
     public static void main(String[] args) {
 

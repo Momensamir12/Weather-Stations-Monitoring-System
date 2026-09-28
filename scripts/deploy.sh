@@ -23,7 +23,7 @@ MINIKUBE_PROFILE="${MINIKUBE_PROFILE:-minikube}"
 SKIP_BUILD="${SKIP_BUILD:-false}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-300}"             # seconds, per rollout
 
-K8S_DIR="kubernetes"
+K8S_DIR="k8s-manifests"
 
 # One entry per image you build:  "<manifest dir>|<Dockerfile>|<build context>"
 # The image NAME is read from the first `image:` line in <manifest dir>/*.yaml, so it
