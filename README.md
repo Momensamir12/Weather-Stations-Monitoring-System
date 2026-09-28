@@ -14,8 +14,9 @@ A distributed, stream-processing pipeline for IoT weather data.
   * [Bitcask](#bitcask)
   * [Data analysis](#data-analysis)
 * [Message schema](#message-schema)
-* [Build and run](#build-and-run)
-* [Kubernetes deployment](#kubernetes-deployment)
+* [Quick start (Docker Compose)](#quick-start-docker-compose)
+* [Kubernetes deployment (optional)](#kubernetes-deployment-optional)
+* [Local development](#local-development)
 * [Kibana analyses](#kibana-analyses)
 
 ---
@@ -68,24 +69,57 @@ Defined in `Common` (`AvroWeatherStatusMessage`):
 
 Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 
-## Build and run
+## Quick start (Docker Compose)
 
-**Prerequisites:** JDK 25, Maven 3.9+, Docker, `kubectl`, and a Kubernetes cluster such as Minikube or Kind.
+The fastest way to run the whole system. One command starts Kafka, Schema Registry, the Open-Meteo adapter, 10 mock weather stations, and the base central station.
 
-The project uses Maven as a multi-module build:
-
-```bash
-mvn clean install
-```
-
-## Kubernetes deployment
-
-Clone the repository and move into the project directory:
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (`docker compose version` should work).
 
 ```bash
 git clone https://github.com/Momensamir12/Weather-Stations-Monitoring-System.git
 cd Weather-Stations-Monitoring-System
+
+docker compose up --build -d
 ```
+
+Check that everything is running:
+
+```bash
+docker compose ps
+docker compose logs -f base-central-station
+```
+
+Stop the system:
+
+```bash
+docker compose down
+```
+
+
+### Configuration
+
+Services are configured through environment variables, set in `docker-compose.yml`:
+
+| Service                | Variable               | Description                              |
+| ---------------------- | ---------------------- | ---------------------------------------- |
+| all                    | `KAFKA_BOOTSTRAP_SERVER` | Kafka bootstrap address (`broker:29092` inside Compose) |
+| all                    | `SCHEMA_REGISTRY_URL`  | Schema Registry URL                      |
+| weather stations       | `STATION_ID`           | Unique station ID (1–10)                 |
+| open-meteo adapter     | `OPEN_METEO_URL`       | Open-Meteo API endpoint                  |
+| base central station   | `BITCASK_DATA_DIR`     | Directory for Bitcask segments           |
+| base central station   | `PARQUET_OUTPUT_DIR`   | Directory for archived Parquet files     |
+
+### Output data
+
+The base central station writes to `./data` on the host (mounted at `/data` in the container):
+
+* `data/bitcask/`: Bitcask segments and `.hint` files
+* `data/parquet/`: archived weather messages
+
+## Kubernetes deployment (
+
+
+**Prerequisites:** Docker, `kubectl`, and a Kubernetes cluster such as Minikube or Kind.
 
 Run the deployment script from the repository root:
 
@@ -94,6 +128,8 @@ Run the deployment script from the repository root:
 ```
 
 The script builds the Docker images, loads them into the Kubernetes cluster, deploys Kafka and Schema Registry, and then starts the weather stations, Open-Meteo adapter, and base central station.
+
+
 
 ## Kibana analyses
 
