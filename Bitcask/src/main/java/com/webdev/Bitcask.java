@@ -54,6 +54,8 @@ public class Bitcask implements AutoCloseable {
     public void put(byte[] key, byte[] value) throws IOException {
         int recordSize = keySizeBytes + valueSizeBytes + key.length + value.length;
         long valueByteOffset = nextWriteOffset + keySizeBytes + valueSizeBytes + key.length;
+        int fileId = fileIdFromPath(writeactiveFilePath);
+
         ByteBuffer buffer = ByteBuffer.allocate(recordSize);
         buffer.putInt(key.length);
         buffer.putInt(value.length);
@@ -67,7 +69,7 @@ public class Bitcask implements AutoCloseable {
             int write = writeactiveFileChannel.write(buffer);
         }
         ByteArrayKey byteArrayKey = new ByteArrayKey(key);
-        KeyDirEntry entry = new KeyDirEntry(fileSequenceNumber.get(), valueByteOffset, value.length);
+        KeyDirEntry entry = new KeyDirEntry(fileId, valueByteOffset, value.length);
         nextWriteOffset += recordSize;
         KeyDirEntry previous = keyDirectory.put(byteArrayKey, entry);
         if (previous != null) {
