@@ -15,8 +15,7 @@ A distributed, stream-processing pipeline for IoT weather data.
   * [Data analysis](#data-analysis)
 * [Message schema](#message-schema)
 * [Quick start (Docker Compose)](#quick-start-docker-compose)
-* [Kubernetes deployment (optional)](#kubernetes-deployment-optional)
-* [Local development](#local-development)
+* [Kubernetes deployment ](#kubernetes-deployment)
 * [Kibana analyses](#kibana-analyses)
 
 ---
@@ -116,7 +115,7 @@ The base central station writes to `./data` on the host (mounted at `/data` in t
 * `data/bitcask/`: Bitcask segments and `.hint` files
 * `data/parquet/`: archived weather messages
 
-## Kubernetes deployment (
+## Kubernetes deployment 
 
 
 **Prerequisites:** Docker, `kubectl`, and a Kubernetes cluster such as Minikube or Kind.
