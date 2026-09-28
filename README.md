@@ -14,7 +14,6 @@ A distributed, stream-processing pipeline for IoT weather data.
   * [Data analysis](#data-analysis)
 * [Message schema](#message-schema)
 * [Build and run](#build-and-run)
-* [Kubernetes deployment](#kubernetes-deployment)
 * [Kibana analyses](#kibana-analyses)
 
 
@@ -101,24 +100,6 @@ Defined in `Common` (`AvroWeatherStatusMessage`):
 
 Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 
-## Build and run
-
-**Prerequisites:** JDK 25, Maven 3.9+, Docker, `kubectl`, and a Kubernetes cluster such as Minikube or Kind.
-
-```bash
-# Build every module
-mvn clean install
-```
-
-### Container images
-
-The Docker build context is the repository root because each Dockerfile needs access to the parent POM and shared modules:
-
-```bash
-docker build -f WeatherStation/Dockerfile      -t weather-station:latest .
-docker build -f OpenMeteoAdapter/Dockerfile    -t open-meteo-adapter:latest .
-docker build -f BaseCentralStation/Dockerfile  -t base-central-station:latest .
-```
 
 ## Kubernetes deployment
 
