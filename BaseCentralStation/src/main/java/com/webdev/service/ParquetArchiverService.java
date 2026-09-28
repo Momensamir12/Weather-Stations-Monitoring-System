@@ -5,6 +5,7 @@ import com.webdev.config.KafkaConfig;
 import com.webdev.constants.Topics;
 import com.webdev.record.PartitionKey;
 import org.apache.avro.specific.SpecificData;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -14,6 +15,7 @@ import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -67,6 +69,8 @@ public class ParquetArchiverService implements ManagedService {
                 var records = c.poll(java.time.Duration.ofMillis(500));
                 records.forEach(buffer::add);
 
+                log.info("parquet writer run loop is running");
+
                 boolean batchFull = buffer.size() >= BATCH_SIZE;
                 boolean timeElapsed =
                         System.currentTimeMillis() - lastFlushMillis >= FLUSH_INTERVAL_MILLIS;
@@ -90,7 +94,15 @@ public class ParquetArchiverService implements ManagedService {
         } catch (IOException e) {
             log.error("parquet-archiver failed while flushing to disk, thread terminating", e);
             throw new UncheckedIOException(e);
+        } catch (Exception e) {
+            log.error("parquet-archiver thread terminating due to unexpected error", e);
+            throw e;
         }
+     catch (Throwable t) {
+        log.error("parquet-archiver thread terminating due to unrecoverable error", t);
+        throw t;
+    }
+
     }
 
     private void flush() throws IOException {
@@ -101,7 +113,7 @@ public class ParquetArchiverService implements ManagedService {
 
         for (var r : buffer) {
             AvroWeatherStatusMessage msg = r.value();
-            LocalDate date = Instant.ofEpochSecond(msg.getStatusTimeStamp())
+            LocalDate date = Instant.ofEpochMilli(msg.getStatusTimeStamp())
                     .atZone(ZoneOffset.UTC)
                     .toLocalDate();
             byPartition
@@ -139,12 +151,17 @@ public class ParquetArchiverService implements ManagedService {
 
         Path hadoopTempPath = new Path(tempPath.toString());
 
+        Configuration conf = new Configuration();
+        conf.set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem");
+
         try (ParquetWriter<AvroWeatherStatusMessage> writer = AvroParquetWriter
                 .<AvroWeatherStatusMessage>builder(hadoopTempPath)
+                .withConf(conf)
                 .withSchema(AvroWeatherStatusMessage.getClassSchema())
                 .withDataModel(SpecificData.get())
                 .withCompressionCodec(CompressionCodecName.SNAPPY)
                 .build()) {
+
 
             for (AvroWeatherStatusMessage msg : messages) {
                 writer.write(msg);

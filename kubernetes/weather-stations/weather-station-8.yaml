@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-station-8
+  labels:
+    app: weather-station-8
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: weather-station-8
+  template:
+    metadata:
+      labels:
+        app: weather-station-8
+    spec:
+      containers:
+        - name: weather-station
+          image: weather-station:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: STATION_ID
+              value: "8"
+            - name: KAFKA_BOOTSTRAP_SERVER
+              value: "kafka:9092"
+            - name: SCHEMA_REGISTRY_URL
+              value: "http://schema-registry:8081"
+      restartPolicy: Always

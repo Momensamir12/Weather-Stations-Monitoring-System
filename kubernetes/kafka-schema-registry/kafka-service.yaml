@@ -1,0 +1,42 @@
+# Headless service: gives the pod a stable DNS name (kafka-0.kafka-headless.kafka.svc.cluster.local)
+# used for inter-broker/controller traffic within the StatefulSet.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  labels:
+    app: kafka
+spec:
+  clusterIP: None
+  # Without this, Kubernetes only creates the per-pod DNS record (kafka-0.kafka-headless...)
+  # once the pod is Ready. But a combined broker+controller node needs to resolve its own
+  # DNS name to connect to the controller and become Ready in the first place — deadlock.
+  publishNotReadyAddresses: true
+  selector:
+    app: kafka
+  ports:
+    - name: controller
+      port: 9093
+      targetPort: 9093
+    - name: internal
+      port: 9092
+      targetPort: 9092
+---
+# Client-facing service other apps in the cluster (and Schema Registry) connect to.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  labels:
+    app: kafka
+spec:
+  type: ClusterIP
+  selector:
+    app: kafka
+  ports:
+    - name: internal
+      port: 9092
+      targetPort: 9092
+    - name: external
+      port: 9094
+      targetPort: 9094

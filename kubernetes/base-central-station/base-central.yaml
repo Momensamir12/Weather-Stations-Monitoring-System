@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-central-service
+  labels:
+    app: base-central-station
+spec:
+  type: LoadBalancer
+  selector:
+    app: base-central-station
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: base-central-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: base-central-station-deployment
+  labels:
+    app: base-central-station
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: base-central-station
+  template:
+    metadata:
+      labels:
+        app: base-central-station
+    spec:
+      # Defensive, same as the weather-station and kafka manifests: avoids
+      # Kubernetes auto-injecting KAFKA_*/SCHEMA_REGISTRY_* env vars into this pod.
+      enableServiceLinks: false
+      containers:
+        - name: base-central-station-container
+          image: base-central-station:latest
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVER
+              value: "kafka:9092"
+            - name: SCHEMA_REGISTRY_URL
+              value: "http://schema-registry:8081"
+            # Point these at the mounted PVC (/data), not the old local dev
+            # path (/home/as/...) — that path doesn't exist in the container image.
+            - name: BITCASK_DATA_DIR
+              value: "/data/bitcask"
+            - name: PARQUET_OUTPUT_DIR
+              value: "/data/parquet"
+
+          volumeMounts:
+            - name: base-central-storage
+              mountPath: /data
+
+      volumes:
+        - name: base-central-storage
+          persistentVolumeClaim:
+            claimName: base-central-storage
+
+      restartPolicy: Always

@@ -1,0 +1,9 @@
+# KRaft requires a fixed, pre-generated cluster ID shared by all brokers/controllers.
+# This one was generated with: python3 -c "import uuid,base64; print(base64.urlsafe_b64encode(uuid.uuid4().bytes).decode().rstrip('='))"
+# (equivalent to running `kafka-storage.sh random-uuid`). Generate your own for a real deployment.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-cluster-id
+data:
+  CLUSTER_ID: "o0Ptul4xTvGksyjOP4ONQg"

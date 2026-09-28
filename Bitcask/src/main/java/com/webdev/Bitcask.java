@@ -293,39 +293,30 @@ public class Bitcask implements AutoCloseable {
     }
 
     void buildKeyDirectory() {
-
-        Set<Integer> processedFiles = new HashSet<>();
-
+        List<Path> dataFiles;
         try (Stream<Path> stream = Files.walk(baseDir)) {
-            stream.filter(Files::isRegularFile)
+            dataFiles = stream
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(BASE_FILE_NAME))
                     .sorted(Comparator.comparingInt(this::fileIdFromPath))
-                    .forEach(path -> {
-                        try {
-                            String fileName = path.getFileName().toString();
-                            int dot = fileName.indexOf('.');
-                            int sequence = Integer.parseInt(fileName.substring(0, dot));
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
 
-                            if(processedFiles.contains(sequence))
-                            {
-                                return;
-                            }
+        try {
+            for (Path path : dataFiles) {
+                Path hintFilePath = pathForHintFileId(fileIdFromPath(path));
+                if (Files.exists(hintFilePath)) {
+                    scanKeysFromHintFile(hintFilePath);
+                }
+            }
 
-                            Path hintFilePath = pathForHintFileId(sequence);
-                            if(Files.exists(hintFilePath))
-                            {
-                                scanKeysFromHintFile(hintFilePath);
-                            }
-
-                            else
-                            {
-                                scanKeysFromDataFile(path);
-                            }
-                            processedFiles.add(sequence);
-
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
+            for (Path path : dataFiles) {
+                if (!Files.exists(pathForHintFileId(fileIdFromPath(path)))) {
+                    scanKeysFromDataFile(path);
+                }
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -510,15 +501,12 @@ public class Bitcask implements AutoCloseable {
             FileChannel currentMergeFile = FileChannel.open(
                     mergeFilePath,
                     StandardOpenOption.CREATE,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.APPEND
-            );
+                    StandardOpenOption.WRITE);
 
             FileChannel currentHintFile = FileChannel.open(
                     hintFilePath,
                     StandardOpenOption.CREATE,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.APPEND);
+                    StandardOpenOption.WRITE);
 
             HashMap<ByteArrayKey, TempKeyDirEntry> tempKeyDirectory = new HashMap<>();
             long mergeFileOffset = 0;

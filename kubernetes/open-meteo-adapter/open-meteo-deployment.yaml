@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-meteo-deployment
+  labels:
+    app: open-meteo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: open-meteo
+  template:
+    metadata:
+      labels:
+        app: open-meteo
+    spec:
+      containers:
+        - name: open-meteo-container
+          image: open-meteo-adapter:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OPEN_METEO_URL
+              value: "https://api.open-meteo.com/v1/forecast"
+            - name: KAFKA_BOOTSTRAP_SERVER
+              value: "kafka:9092"
+            - name: SCHEMA_REGISTRY_URL
+              value: "http://schema-registry:8081"
+      restartPolicy: Always

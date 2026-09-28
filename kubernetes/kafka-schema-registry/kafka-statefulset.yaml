@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  labels:
+    app: kafka
+spec:
+  serviceName: kafka-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      # Kubernetes auto-injects <SERVICE_NAME>_PORT-style env vars for every Service
+      # in the namespace (e.g. KAFKA_PORT=tcp://<clusterIP>:9092 for our "kafka" Service).
+      # That collides with cp-kafka's own KAFKA_* env var convention and makes the
+      # container's configure script think a legacy `port` property was set, causing
+      # it to exit 1 on startup. Disable the injection entirely.
+      enableServiceLinks: false
+      # local-path-provisioner (kind's default StorageClass) backs PVCs with hostPath
+      # volumes owned by root. fsGroup doesn't apply to hostPath, so we chown explicitly
+      # before the (non-root, uid 1000) kafka container starts.
+      initContainers:
+        - name: fix-data-dir-permissions
+          image: busybox:1.36
+          command: ["sh", "-c", "chown -R 1000:1000 /var/lib/kafka/data"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.9.6
+          ports:
+            - name: internal
+              containerPort: 9092
+            - name: controller
+              containerPort: 9093
+          env:
+            # --- KRaft core settings ---
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+            - name: CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-cluster-id
+                  key: CLUSTER_ID
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@kafka-0.kafka-headless:9093"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+
+            # --- Listeners ---
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-0.kafka-headless:9092"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+
+            # --- Storage ---
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
+
+            # --- Single-node friendly defaults ---
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 30
+            periodSeconds: 15
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+        # storageClassName: standard   # uncomment/set to match your cluster's StorageClasslass

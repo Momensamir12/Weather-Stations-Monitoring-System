@@ -49,7 +49,7 @@ INDEX_MAPPING = {
             "station_id": {"type": "long"},
             "s_no": {"type": "long"},
             "battery_status": {"type": "keyword"},
-            "status_timestamp": {"type": "date", "format": "epoch_second||epoch_millis"},
+            "status_timestamp": {"type": "date", "format": "epoch_millis"},
             "weather": {
                 "properties": {
                     "humidity": {"type": "integer"},

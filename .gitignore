@@ -1,16 +1,16 @@
 WeatherStation/target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-.kotlin
-out
-data
-.parquet
-.data
-write-path-profiler.py
-logs
-.log
-.jfr
+# Maven
+**/target/
+
+# Build artifacts
+*.jar
+*.jfr
+*.log
+
+# Generated data
+data/
+*.parquet
+.data/
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

@@ -12,6 +12,9 @@ public class AppBootstrap {
 
     public static Dotenv loadEnv() {
         System.setProperty("org.apache.avro.SERIALIZABLE_PACKAGES", "com.webdev.avro");
-        return Dotenv.load();
+        return Dotenv
+                .configure()
+                .ignoreIfMissing()
+                .load();
     }
 }
