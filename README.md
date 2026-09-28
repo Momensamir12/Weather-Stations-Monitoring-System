@@ -15,7 +15,7 @@ A distributed, stream-processing pipeline for IoT weather data.
   * [Data analysis](#data-analysis)
 * [Message schema](#message-schema)
 * [Quick start (Docker Compose)](#quick-start-docker-compose)
-* [Kubernetes deployment ](#kubernetes-deployment)
+* [Kubernetes deployment](#kubernetes-deployment)
 * [Kibana analyses](#kibana-analyses)
 
 ---
