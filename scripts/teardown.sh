@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# teardown the cluster
+# Remove everything deploy.sh created, in reverse dependency order:
+# central -> stations -> Open-Meteo -> Schema Registry -> Kafka.
 #
 # Usage:
 #   ./teardown.sh                 # asks for confirmation, deletes workloads AND stored data
@@ -10,7 +11,7 @@
 # consumer offsets are gone. The next deploy starts from a completely clean slate.
 
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."   # repo root (this script lives in scripts/)
 
 KEEP_DATA="${KEEP_DATA:-false}"
 K8S_DIR="kubernetes"

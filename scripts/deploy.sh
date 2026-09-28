@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Build the Docker images, load them into the cluster, and deploy the stack in
+# dependency order: Kafka -> Schema Registry -> Open-Meteo -> 10 stations -> central.
 #
+# Lives in <repo>/scripts/. Run it from anywhere: it cd's to the repo root (one level up).
 #
 # Usage:
 #   ./deploy.sh                          # kind cluster named "kind"
@@ -10,7 +12,7 @@
 #   SKIP_BUILD=true ./deploy.sh          # skip docker build + image load, only (re)apply manifests
 
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."   # repo root (this script lives in scripts/)
 
 # ----------------------------------------------------------------------------
 # Configuration
@@ -23,7 +25,13 @@ WAIT_TIMEOUT="${WAIT_TIMEOUT:-300}"             # seconds, per rollout
 
 K8S_DIR="kubernetes"
 
-
+# One entry per image you build:  "<manifest dir>|<Dockerfile>|<build context>"
+# The image NAME is read from the first `image:` line in <manifest dir>/*.yaml, so it
+# always matches what the manifests actually run.
+#
+# >>> EDIT the Dockerfile paths and contexts to match your repo. <<<
+# Use "." as the context (repo root) if the Dockerfile copies sibling modules such as
+# Common/ or Bitcask/ into the image.
 BUILD_TARGETS=(
   "$K8S_DIR/base-central-station|BaseCentralStation/Dockerfile|."
   "$K8S_DIR/weather-stations|WeatherStation/Dockerfile|."
@@ -39,6 +47,7 @@ die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 need() { command -v "$1" >/dev/null 2>&1 || die "'$1' is not installed or not on PATH"; }
 
+# First `image:` value found in a directory's manifests (all stations share one image).
 image_from_manifest() {
   grep -hE '^[[:space:]]*image:' "$1"/*.yaml 2>/dev/null \
     | head -n1 | awk '{print $2}' | tr -d "\"'" || true
@@ -79,6 +88,9 @@ apply_files() {
   done
 }
 
+# Apply a manifest file or directory. If any of its Deployments already existed, restart
+# them so they pick up a freshly loaded image (":latest" + IfNotPresent would otherwise
+# keep running the old one).
 deploy_app() {
   local label="$1" path="$2" before d
   log "Deploying $label"
@@ -94,14 +106,19 @@ deploy_app() {
 wait_for_kafka() {
   log "Waiting for Kafka"
   kubectl rollout status statefulset/kafka --timeout="${WAIT_TIMEOUT}s"
-  for _ in $(seq 1 60); do
-    if kubectl exec kafka-0 -- kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1; then
+  kubectl wait --for=condition=Ready pod/kafka-0 --timeout="${WAIT_TIMEOUT}s"
+
+  echo "Checking that the broker answers (up to ~2 min)..."
+  local out attempt
+  for attempt in $(seq 1 24); do
+    if out="$(kubectl exec kafka-0 -c kafka -- kafka-topics --bootstrap-server kafka:9092 --list 2>&1)"; then
       echo "Kafka is accepting connections."
       return 0
     fi
+    echo "  attempt $attempt/24 failed: $(tail -n1 <<< "$out")"
     sleep 5
   done
-  die "Kafka did not become ready in time (try: kubectl logs kafka-0)"
+  warn "Kafka pod is Ready but the broker check kept failing (last error above). Continuing; the apps retry on their own."
 }
 
 wait_for_schema_registry() {

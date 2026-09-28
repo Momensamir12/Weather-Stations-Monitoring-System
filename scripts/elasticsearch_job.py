@@ -26,8 +26,8 @@ from elasticsearch.helpers import bulk, BulkIndexError
 
 import os
 
-PARQUET_DIR = Path(os.environ.get("PARQUET_OUTPUT_DIR", "./data/parquet"))
-STATE_FILE = Path(os.environ.get("PARQUET_INGEST_STATE_FILE", "./data/parquet-ingest-state.txt"))
+PARQUET_DIR = Path(os.environ.get("PARQUET_OUTPUT_DIR", ".././data/parquet"))
+STATE_FILE = Path(os.environ.get("PARQUET_INGEST_STATE_FILE", ".././data/parquet-ingest-state.txt"))
 ES_URL = os.environ.get("ELASTICSEARCH_URL", "http://localhost:9200")
 ES_INDEX = os.environ.get("ELASTICSEARCH_INDEX", "weather-status")
 
