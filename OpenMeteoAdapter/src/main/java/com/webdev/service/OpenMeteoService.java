@@ -114,7 +114,6 @@ public class OpenMeteoService implements ManagedService{
         OpenMeteoMessage msg = objectMapper.readValue(response.body(), OpenMeteoMessage.class);
         AvroWeatherStatusMessage avroMsg = OpenMeteoMessageMapper.toAvro(msg, ++sequenceNumber, stationId);
 
-        System.out.println(avroMsg);
         statusPublisher.publish(avroMsg);
         log.debug("Published reading stationId={} sNo={}", stationId, sequenceNumber);
     }

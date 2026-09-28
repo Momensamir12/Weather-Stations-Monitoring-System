@@ -69,8 +69,6 @@ public class ParquetArchiverService implements ManagedService {
                 var records = c.poll(java.time.Duration.ofMillis(500));
                 records.forEach(buffer::add);
 
-                log.info("parquet writer run loop is running");
-
                 boolean batchFull = buffer.size() >= BATCH_SIZE;
                 boolean timeElapsed =
                         System.currentTimeMillis() - lastFlushMillis >= FLUSH_INTERVAL_MILLIS;

@@ -34,7 +34,6 @@ public class KafkaStatusPublisher implements StatusPublisher {
                         "Failed to publish weather status to Kafka", exception);
             }
         });
-        System.out.println(message.toString());
         log.debug(message.toString());
     }
 
