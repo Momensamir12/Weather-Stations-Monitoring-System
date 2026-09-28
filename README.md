@@ -46,7 +46,10 @@ It also exposes the Bitcask store through a socket server, allowing clients to q
 
 The system includes a Bitcask-style log-structured key-value store for maintaining the latest weather status of each station.
 
-Records are appended to segment files, while background compaction removes outdated entries. Hint files are used to speed up recovery by allowing the key directory to be rebuilt without scanning every record in the data files.
+Records are appended to the active segment file using the binary format `keySize(4) | valueSize(4) | key | value`. When a segment reaches its size limit, a new segment is created.
+
+A background merge process periodically compacts immutable segments by retaining only the latest entry for each key and removing outdated records. The merge also generates `.hint` files containing the key locations in the merged segment. During recovery, these hint files allow the key directory to be rebuilt without scanning the complete data files, reducing startup time.
+
 
 ### Data analysis
 
