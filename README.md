@@ -1,3 +1,23 @@
+# Weather Stations Monitoring System
+
+A distributed, stream-processing pipeline for IoT weather data.
+
+---
+
+## Table of contents
+
+* [Architecture](#architecture)
+  * [Weather stations](#weather-stations)
+  * [Open-Meteo adapter](#open-meteo-adapter)
+  * [Base central station](#base-central-station)
+  * [Bitcask](#bitcask)
+  * [Data analysis](#data-analysis)
+* [Message schema](#message-schema)
+* [Build and run](#build-and-run)
+* [Kubernetes deployment](#kubernetes-deployment)
+* [Kibana analyses](#kibana-analyses)
+
+
 ## Architecture
 
 ![architecture](architecture.jpg)
