@@ -24,7 +24,6 @@ A distributed, stream-processing pipeline for IoT weather data.
 
 ![architecture](architecture.jpg)
 
-The system is a distributed, stream-processing pipeline for IoT weather data.
 
 ### Weather stations
 
@@ -75,14 +74,9 @@ Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 
 **Prerequisites:** JDK 25, Maven 3.9+, Docker, `kubectl`, and a Kubernetes cluster such as Minikube or Kind.
 
-```bash
-# Build every module
-mvn clean install
-```
 
 ### Container images
 
-The Docker build context is the repository root because each Dockerfile needs access to the parent POM and shared modules:
 
 ```bash
 docker build -f WeatherStation/Dockerfile     -t weather-station:latest .
@@ -105,13 +99,14 @@ Run the deployment script from the repository root:
 ./scripts/deploy.sh
 ```
 
+
 The script builds the Docker images, loads them into the Kubernetes cluster, deploys Kafka and Schema Registry, and then starts the weather stations, Open-Meteo adapter, and base central station.
 
 ## Kibana analyses
 
 The weather data stored in Elasticsearch is analyzed in Kibana to validate the behavior of the simulated weather stations.
 
-### Battery status distribution per station
+### Battery status distribution
 
 The battery status distribution approaches the specified 30% low, 40% medium, and 30% high distribution as more messages are collected.
 
