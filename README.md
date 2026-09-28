@@ -13,7 +13,7 @@ A distributed, stream-processing pipeline for IoT weather data.
   * [Bitcask](#bitcask)
   * [Data analysis](#data-analysis)
 * [Message schema](#message-schema)
-* [Build and run](#build-and-run)
+* [Kubernetes Deployment](#Kubernetes-deployment)
 * [Kibana analyses](#kibana-analyses)
 
 
