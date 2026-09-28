@@ -54,9 +54,9 @@ Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 ### Weather station 
 
 `WeatherStation` emits a reading every second. Battery status is varied randomly as following : 
-  *Low = 30% 
-  *Medium = 40% 
-  *High = 30% 
+  Low = 30%, 
+  Medium = 40% 
+  High = 30%
 and 10% of generated messages are dropped before publishing to simulate network failures and queryable data which will get ingested by elastic search 
 
 
