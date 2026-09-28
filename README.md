@@ -7,15 +7,18 @@ A distributed, stream-processing pipeline for IoT weather data.
 ## Table of contents
 
 * [Architecture](#architecture)
+
   * [Weather stations](#weather-stations)
   * [Open-Meteo adapter](#open-meteo-adapter)
   * [Base central station](#base-central-station)
   * [Bitcask](#bitcask)
   * [Data analysis](#data-analysis)
 * [Message schema](#message-schema)
-* [Kubernetes Deployment](#Kubernetes-deployment)
+* [Build and run](#build-and-run)
+* [Kubernetes deployment](#kubernetes-deployment)
 * [Kibana analyses](#kibana-analyses)
 
+---
 
 ## Architecture
 
@@ -49,23 +52,6 @@ Records are appended to segment files, while background compaction removes outda
 
 All incoming weather messages are archived as Parquet files and later ingested into Elasticsearch. Kibana is used to analyze the collected data, including battery status distribution and dropped messages per station.
 
-# Weather Stations Monitoring System
-
-A distributed, stream-processing pipeline for IoT weather data.
-
-
-## Architecture
-
-![architecture](architecture.jpg)
-
-* Mock weather stations send weather status messages to Kafka every second.
-* The Open-Meteo adapter service polls current weather data from the Open-Meteo API and forwards it to Kafka.
-* Base central station:
-
-  * detects rain by checking for weather messages with humidity above 70%;
-  * maintains an up-to-date view of each station's latest weather status in Bitcask, using the station ID as the key;
-  * maintains a history of weather messages by writing all incoming messages to Parquet files, which can then be ingested into Elasticsearch and analyzed in Kibana.
-
 ## Message schema
 
 Defined in `Common` (`AvroWeatherStatusMessage`):
@@ -82,6 +68,24 @@ Defined in `Common` (`AvroWeatherStatusMessage`):
 
 Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 
+## Build and run
+
+**Prerequisites:** JDK 25, Maven 3.9+, Docker, `kubectl`, and a Kubernetes cluster such as Minikube or Kind.
+
+```bash
+# Build every module
+mvn clean install
+```
+
+### Container images
+
+The Docker build context is the repository root because each Dockerfile needs access to the parent POM and shared modules:
+
+```bash
+docker build -f WeatherStation/Dockerfile     -t weather-station:latest .
+docker build -f OpenMeteoAdapter/Dockerfile   -t open-meteo-adapter:latest .
+docker build -f BaseCentralStation/Dockerfile -t base-central-station:latest .
+```
 
 ## Kubernetes deployment
 
@@ -106,16 +110,15 @@ The weather data stored in Elasticsearch is analyzed in Kibana to validate the b
 
 ### Battery status distribution per station
 
-The battery status distribution confirms the specified 30% low, 40% medium, and 30% high distribution as more messages are collected.
+The battery status distribution approaches the specified 30% low, 40% medium, and 30% high distribution as more messages are collected.
 
 ![Battery status distribution](battery-percentage.png)
 
 ### Dropped messages per station
 
-10% of generated weather-station messages are intentionally dropped before being published to Kafka.
+10% of generated weather-station messages are intentionally dropped before being published to Kafka. The resulting sequence-number gaps are used to determine the dropped-message rate.
 
 ![Dropped messages per station](dropped-messages.png)
-
 
 
 
