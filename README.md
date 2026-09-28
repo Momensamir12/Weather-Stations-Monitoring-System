@@ -24,7 +24,6 @@ A distributed, stream-processing pipeline for IoT weather data.
 
 ![architecture](architecture.jpg)
 
-
 ### Weather stations
 
 Mock weather stations generate weather readings every second and publish them to Kafka. Each station has a unique station ID and randomly generated battery status and weather data. 10% of generated messages are intentionally dropped before publishing to simulate message loss.
@@ -48,7 +47,6 @@ Bitcask-style log-structured key-value store for maintaining the latest weather 
 Records are appended using the format `keySize(4) | valueSize(4) | key | value`. When a segment reaches its size limit, a new segment is created.
 
 A background merge process periodically compacts immutable segments by retaining only the latest entry for each key and removing outdated records. The merge also generates `.hint` files containing the key locations in the merged segment. During recovery, these hint files allow the key directory to be rebuilt without scanning the complete data files, reducing startup time.
-
 
 ### Data analysis
 
@@ -74,14 +72,10 @@ Rain events (`AvroRainMessage`) contain `stationId` and `humidity`.
 
 **Prerequisites:** JDK 25, Maven 3.9+, Docker, `kubectl`, and a Kubernetes cluster such as Minikube or Kind.
 
-
-### Container images
-
+The project uses Maven as a multi-module build:
 
 ```bash
-docker build -f WeatherStation/Dockerfile     -t weather-station:latest .
-docker build -f OpenMeteoAdapter/Dockerfile   -t open-meteo-adapter:latest .
-docker build -f BaseCentralStation/Dockerfile -t base-central-station:latest .
+mvn clean install
 ```
 
 ## Kubernetes deployment
@@ -98,7 +92,6 @@ Run the deployment script from the repository root:
 ```bash
 ./scripts/deploy.sh
 ```
-
 
 The script builds the Docker images, loads them into the Kubernetes cluster, deploys Kafka and Schema Registry, and then starts the weather stations, Open-Meteo adapter, and base central station.
 
@@ -117,6 +110,4 @@ The battery status distribution approaches the specified 30% low, 40% medium, an
 10% of generated weather-station messages are intentionally dropped before being published to Kafka. The resulting sequence-number gaps are used to determine the dropped-message rate.
 
 ![Dropped messages per station](dropped-messages.png)
-
-
 
